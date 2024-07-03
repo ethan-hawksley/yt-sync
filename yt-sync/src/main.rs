@@ -115,7 +115,7 @@ fn sync_playlist(id: &String, location: &String) -> Result<(), Box<dyn std::erro
     for video in video_ids {
         let mut exists = false;
         for downloaded_video in &downloaded_videos {
-            if downloaded_video.contains(&video) {
+            if downloaded_video.contains(&video) && downloaded_video.contains("opus") {
                 exists = true;
                 break;
             }
