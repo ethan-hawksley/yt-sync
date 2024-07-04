@@ -1,3 +1,4 @@
+use indicatif::ProgressIterator;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -81,8 +82,7 @@ fn get_video_ids(playlist_id: &String) -> Result<Vec<String>, Box<dyn std::error
     Ok(video_ids)
 }
 
-fn download_video(video_id: &String, path: &String) {
-    println!("Downloading {}...", video_id);
+fn download_video(video_id: &String, path: &String) -> bool {
     let destination = String::from("-P ") + path;
     let output = Command::new("yt-dlp")
         .arg(destination)
@@ -94,10 +94,15 @@ fn download_video(video_id: &String, path: &String) {
         .arg(video_id)
         .output();
 
-    println!("{:?}", output);
+    if !format!("{:?}", output).starts_with("Ok") {
+        println!("{:?}", output);
+        return false;
+    }
+    true
 }
 
 fn sync_playlist(id: &String, location: &String) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Downloading playlist: {}", id);
     let path = PathBuf::from(location);
 
     if !path.exists() {
@@ -112,7 +117,9 @@ fn sync_playlist(id: &String, location: &String) -> Result<(), Box<dyn std::erro
         .map(|entry| entry.file_name().to_string_lossy().to_string())
         .collect();
 
-    for video in video_ids {
+    let mut download_count = 0;
+
+    for video in video_ids.into_iter().progress() {
         let mut exists = false;
         for downloaded_video in &downloaded_videos {
             if downloaded_video.contains(&video) && downloaded_video.contains("opus") {
@@ -120,10 +127,14 @@ fn sync_playlist(id: &String, location: &String) -> Result<(), Box<dyn std::erro
                 break;
             }
         }
-        if !exists {
-            download_video(&video, location);
+        if !exists && download_video(&video, location) {
+            download_count += 1;
         }
     }
+    println!(
+        "{} new songs successfully synced to {}",
+        download_count, location
+    );
     Ok(())
 }
 
@@ -138,9 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     for playlist in &config.items {
-        println!("Downloading playlist: {:?}", playlist);
         sync_playlist(&playlist.id, &playlist.location)?;
-        println!("All songs saved to {}", playlist.location);
     }
     Ok(())
 }
