@@ -1,9 +1,8 @@
 use indicatif::ProgressIterator;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::fs;
-use std::io::{self, Write};
-use std::path::PathBuf;
+use std::fs::{self, File};
+use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -20,11 +19,13 @@ struct Item {
 #[derive(Deserialize, Debug)]
 struct VideoInfo {
     id: String,
+    title: String,
 }
 
 fn get_config_path() -> PathBuf {
-    let homedir = dirs::home_dir().expect("Unable to locate home directory");
-    homedir.join(".config/yt-sync/config.toml")
+    dirs::home_dir()
+        .expect("Unable to locate home directory")
+        .join(".config/yt-sync/config.toml")
 }
 
 fn create_default_config() -> Config {
@@ -42,29 +43,36 @@ fn create_default_config() -> Config {
     Config { items }
 }
 
-fn write_default_config(path: &PathBuf, config: &Config) -> io::Result<()> {
+fn write_default_config(path: &Path, config: &Config) -> io::Result<()> {
     let toml_string = toml::to_string(config).expect("Failed to serialize default config");
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let mut file = fs::File::create(path)?;
-    file.write_all(toml_string.as_bytes())?;
+    let file = File::create(path)?;
+    let mut writer = BufWriter::new(file);
+    writer.write_all(toml_string.as_bytes())?;
     println!("Created default config at {:?}", path);
     Ok(())
 }
 
-fn read_config(path: &PathBuf) -> io::Result<Config> {
-    let content = fs::read_to_string(path)?;
+fn read_config(path: &Path) -> io::Result<Config> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut content = String::new();
+    reader.read_to_string(&mut content)?;
     let config: Config = toml::from_str(&content).expect("Failed to parse config");
     println!("Loaded config at {:?}", path);
     Ok(config)
 }
-fn get_video_ids(playlist_id: &String) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let url = String::from("https://www.youtube.com/playlist?list=") + playlist_id;
+
+fn get_video_ids(
+    playlist_id: &str,
+) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
+    let url = format!("https://www.youtube.com/playlist?list={}", playlist_id);
     let output = Command::new("yt-dlp")
-        .arg("-j") // Output info in JSON format
+        .arg("-j")
         .arg("--flat-playlist")
-        .arg(url)
+        .arg(&url)
         .output()?;
 
     if !output.status.success() {
@@ -72,20 +80,22 @@ fn get_video_ids(playlist_id: &String) -> Result<Vec<String>, Box<dyn std::error
     }
 
     let stdout = String::from_utf8(output.stdout)?;
+    let mut video_titles = Vec::new();
     let mut video_ids = Vec::new();
 
     for line in stdout.lines() {
         let video_info: VideoInfo = serde_json::from_str(line)?;
+        video_titles.push(sanitize_filename(video_info.title.as_str()));
         video_ids.push(video_info.id);
     }
 
-    Ok(video_ids)
+    Ok((video_ids, video_titles))
 }
 
-fn download_video(video_id: &String, path: &String) -> bool {
-    let destination = String::from("-P ") + path;
+fn download_video(video_id: &str, path: &str) -> bool {
     let output = Command::new("yt-dlp")
-        .arg(destination)
+        .arg("-P")
+        .arg(path)
         .arg("-x")
         .arg("--format")
         .arg("bestaudio")
@@ -94,40 +104,61 @@ fn download_video(video_id: &String, path: &String) -> bool {
         .arg(video_id)
         .output();
 
-    if !format!("{:?}", output).starts_with("Ok") {
-        println!("{:?}", output);
-        return false;
+    match output {
+        Ok(output) if output.status.success() => true,
+        Ok(output) => {
+            println!("yt-dlp failed with output: {:?}", output);
+            false
+        }
+        Err(e) => {
+            println!("Failed to execute yt-dlp: {:?}", e);
+            false
+        }
     }
-    true
 }
 
-fn sync_playlist(id: &String, location: &String) -> Result<(), Box<dyn std::error::Error>> {
+fn sanitize_filename(filename: &str) -> String {
+    let filename = filename
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '？' => '_',
+            _ => c,
+        })
+        .collect();
+    filename
+}
+
+fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
-    let path = PathBuf::from(location);
+    let path = Path::new(location);
 
     if !path.exists() {
-        fs::create_dir_all(&path)?;
+        fs::create_dir_all(path)?;
     }
 
-    let video_ids = get_video_ids(id)?;
-    println!("Playlist contains: {:?}", video_ids);
+    let (video_ids, video_titles) = get_video_ids(id)?;
+    println!("Playlist contains: {:?}", video_titles);
 
-    let downloaded_videos: HashSet<String> = fs::read_dir(&path)?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.file_name().to_string_lossy().to_string())
-        .collect();
+    let mut downloaded_videos = Vec::new();
+
+    for entry in fs::read_dir(location)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(filename) = path.file_name() {
+                if let Some(filename_str) = filename.to_str() {
+                    downloaded_videos.push(sanitize_filename(filename_str));
+                }
+            }
+        }
+    }
 
     let mut download_count = 0;
 
-    for video in video_ids.into_iter().progress() {
-        let mut exists = false;
-        for downloaded_video in &downloaded_videos {
-            if downloaded_video.contains(&video) && downloaded_video.contains("opus") {
-                exists = true;
-                break;
-            }
-        }
-        if !exists && download_video(&video, location) {
+    for (i, video) in video_ids.iter().progress().enumerate() {
+        let video_title = sanitize_filename(video_titles[i].as_str());
+        let file_name = format!("{} [{}].opus", video_title, video);
+        if !downloaded_videos.contains(&file_name) && download_video(video, location) {
             download_count += 1;
         }
     }
