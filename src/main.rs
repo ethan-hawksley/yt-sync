@@ -185,5 +185,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for playlist in &config.items {
         sync_playlist(&playlist.id, &playlist.location)?;
     }
+
     Ok(())
 }
