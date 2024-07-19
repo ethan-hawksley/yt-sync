@@ -1,9 +1,11 @@
-use indicatif::ProgressIterator;
-use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use indicatif::ProgressIterator;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 struct Config {
@@ -139,7 +141,7 @@ fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Err
     let (video_ids, video_titles) = get_video_ids(id)?;
     println!("Playlist contains: {:?}", video_titles);
 
-    let mut downloaded_videos = Vec::new();
+    let mut downloaded_videos = HashSet::new();
 
     for entry in fs::read_dir(location)? {
         let entry = entry?;
@@ -147,7 +149,7 @@ fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Err
         if path.is_file() {
             if let Some(filename) = path.file_name() {
                 if let Some(filename_str) = filename.to_str() {
-                    downloaded_videos.push(sanitize_filename(filename_str));
+                    downloaded_videos.insert(sanitize_filename(filename_str));
                 }
             }
         }
@@ -166,6 +168,7 @@ fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Err
         "{} new songs successfully synced to {}",
         download_count, location
     );
+
     Ok(())
 }
 
