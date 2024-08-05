@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.13", features = ["derive", "unicode"] }
 dirs = "5.0.1"
 indicatif = "0.17.8"
 serde = { version = "1.0.203", features = ["derive"] }

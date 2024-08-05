@@ -6,6 +6,7 @@ use std::process::Command;
 
 use indicatif::ProgressIterator;
 use serde::{Deserialize, Serialize};
+use clap::Parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct Config {
@@ -16,6 +17,7 @@ struct Config {
 struct Item {
     id: String,
     location: String,
+    format: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -24,8 +26,21 @@ struct VideoInfo {
     title: String,
 }
 
-fn get_config_path() -> PathBuf {
-    dirs::home_dir().expect("Unable to locate home directory").join(".config/yt-sync/config.toml")
+#[derive(Parser, Debug)]
+#[command(name = "yt-sync", about = "Sync YouTube playlists to your local storage")]
+struct Args {
+    #[arg(short, long, default_value_t = get_default_config_path())]
+    config: String,
+    #[arg(short, long)]
+    playlist_id: Option<String>,
+    #[arg(short, long)]
+    location: Option<String>,
+    #[arg(short, long)]
+    format: Option<String>,
+}
+
+fn get_default_config_path() -> String {
+    dirs::home_dir().unwrap().join(".config/yt-sync/config.toml").to_str().unwrap().to_string()
 }
 
 fn create_default_config() -> Config {
@@ -34,10 +49,12 @@ fn create_default_config() -> Config {
             Item {
                 id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
                 location: "/home/user/Downloads/file_output".to_string(),
+                format: "audio".to_string(),
             },
             Item {
                 id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
                 location: "/home/user/Downloads/file_output2".to_string(),
+                format: "video".to_string(),
             },
         ],
     }
@@ -45,9 +62,8 @@ fn create_default_config() -> Config {
 
 fn write_default_config(path: &Path, config: &Config) -> io::Result<()> {
     let toml_string = toml::to_string(config).expect("Failed to serialize default config");
-    fs::create_dir_all(path.parent().expect("Failed to find parent directory"))?;
-    let mut writer = BufWriter::new(File::create(path)?);
-    writer.write_all(toml_string.as_bytes())?;
+    fs::create_dir_all(path.parent().unwrap())?;
+    BufWriter::new(File::create(path)?).write_all(toml_string.as_bytes())?;
     println!("Created default config at {:?}", path);
     Ok(())
 }
@@ -80,11 +96,14 @@ fn get_video_ids(playlist_id: &str) -> Result<(Vec<String>, Vec<String>), Box<dy
     Ok((video_ids, video_titles))
 }
 
-fn download_video(video_id: &str, path: &str) -> bool {
-    match Command::new("yt-dlp")
-        .args(&["-P", path, "-x", "--format", "bestaudio", "--embed-thumbnail", "-q", video_id])
-        .output()
-    {
+fn download_video(video_id: &str, path: &str, format: &str) -> bool {
+    let mut args = vec!["-P", path, "-q", "--embed-thumbnail", video_id];
+    if format == "audio" {
+        args.extend(&["-x", "--audio-format", "opus"]);
+    } else {
+        args.extend(&["-f", "bestvideo+bestaudio", "--merge-output-format", "mkv"]);
+    }
+    match Command::new("yt-dlp").args(&args).output() {
         Ok(output) if output.status.success() => true,
         Ok(output) => {
             println!("yt-dlp failed with output: {:?}", output);
@@ -104,7 +123,7 @@ fn sanitize_filename(filename: &str) -> String {
     }).collect()
 }
 
-fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_playlist(id: &str, location: &str, format: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
     fs::create_dir_all(location)?;
 
@@ -117,7 +136,7 @@ fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Err
 
     let download_count = video_ids.iter().progress().enumerate().filter(|(i, video_id)| {
         let file_name = format!("{} [{}].opus", sanitize_filename(&video_titles[*i]), video_id);
-        !downloaded_videos.contains(&file_name) && download_video(video_id, location)
+        !downloaded_videos.contains(&file_name) && download_video(video_id, location, format)
     }).count();
 
     println!("{} new songs successfully synced to {}", download_count, location);
@@ -125,7 +144,9 @@ fn sync_playlist(id: &str, location: &str) -> Result<(), Box<dyn std::error::Err
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config_path = get_config_path();
+    let args = Args::parse();
+
+    let config_path = PathBuf::from(&args.config);
     let config = if config_path.exists() {
         read_config(&config_path)?
     } else {
@@ -134,8 +155,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         default_config
     };
 
-    for playlist in &config.items {
-        sync_playlist(&playlist.id, &playlist.location)?;
+    if let (Some(playlist_id), Some(location)) = (args.playlist_id, args.location) {
+        let format = args.format.unwrap_or_else(|| "audio".to_string());
+        sync_playlist(&playlist_id, &location, &format)?;
+    } else {
+        for playlist in &config.items {
+            sync_playlist(&playlist.id, &playlist.location, &playlist.format)?;
+        }
     }
 
     Ok(())
