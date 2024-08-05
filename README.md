@@ -1,2 +1,2 @@
 # yt-sync
- A command-line tool to synchronize a youtube playlist to a local folder.
+A CLI tool to sync your YouTube subscriptions to a local directory.
