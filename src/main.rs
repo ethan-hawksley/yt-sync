@@ -87,7 +87,7 @@ fn get_video_ids(playlist_id: &str) -> Result<(Vec<String>, Vec<String>), Box<dy
         .output()?;
 
     if !output.status.success() {
-        return Err(format!("yt-dlp failed with status: {}", output.status).into());
+        return Err(format!("yt-dlp failed with output: {:?}", output).into());
     }
 
     let stdout = String::from_utf8(output.stdout)?;
