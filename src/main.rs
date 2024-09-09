@@ -116,7 +116,7 @@ fn download_video(video_id: &str, path: &str, format: &str) -> bool {
     match Command::new("yt-dlp").args(&args).output() {
         Ok(output) if output.status.success() => true,
         Ok(output) => {
-            println!("yt-dlp failed to download {} with output: {:?}", video_id, output);
+            println!("yt-dlp failed to download {} with args: {:?} and with output: {:?}", video_id, args, output);
             false
         }
         Err(e) => {
