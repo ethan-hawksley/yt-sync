@@ -105,7 +105,8 @@ fn get_video_ids(playlist_id: &str) -> Result<(Vec<String>, Vec<String>), Box<dy
 // Download a video from YouTube using yt-dlp.
 fn download_video(video_id: &str, path: &str, format: &str) -> bool {
     // Create a list of arguments to pass to yt-dlp.
-    let mut args = vec!["-P", path, "-q", "--embed-thumbnail", r#"""#, video_id, r#"""#];
+    let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
+    let mut args = vec!["-P", path, "-q", "--embed-thumbnail", &*video_url];
     if format == "audio" {
         args.extend(&["-x", "--audio-format", "opus"]);
     } else {
