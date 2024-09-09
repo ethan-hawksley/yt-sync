@@ -18,6 +18,7 @@ struct Item {
     id: String,
     location: String,
     format: String,
+    save_playlist: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -53,11 +54,13 @@ fn create_default_config() -> Config {
                 id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
                 location: "/home/user/Downloads/file_output".to_string(),
                 format: "audio".to_string(),
+                save_playlist: "true".to_string(),
             },
             Item {
                 id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
                 location: "/home/user/Downloads/file_output2".to_string(),
                 format: "video".to_string(),
+                save_playlist: "false".to_string(),
             },
         ],
     }
@@ -136,7 +139,7 @@ fn sanitize_filename(filename: &str) -> String {
 }
 
 // Sync a YouTube playlist to a local directory, ensuring no duplicates are downloaded.
-fn sync_playlist(id: &str, location: &str, format: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
     fs::create_dir_all(location)?;
 
@@ -145,14 +148,42 @@ fn sync_playlist(id: &str, location: &str, format: &str) -> Result<(), Box<dyn s
     println!("Playlist contains: {:?}", video_titles);
 
     // Get the list of already downloaded videos.
-    let downloaded_videos: HashSet<_> = fs::read_dir(location)?
+    let folder_contents: HashSet<_> = fs::read_dir(location)?
         .filter_map(|entry| entry.ok().and_then(|e| e.path().file_name()?.to_str().map(sanitize_filename)))
         .collect();
+    
+    let mut m3u_file = None;
+    if save_playlist == "true" {
+        // Extract the parent directory and the child directory name.
+        let location_path = Path::new(location);
+        let parent_dir = location_path.parent().unwrap();
+        let child_dir_name = location_path.file_name().unwrap().to_str().unwrap();
+
+        // Create the m3u file in the parent directory.
+        let m3u_file_path = parent_dir.join(format!("{}.m3u", child_dir_name));
+        // Try to delete old file
+        let _ = fs::remove_file(&m3u_file_path).is_err();
+
+        m3u_file = Some(BufWriter::new(File::create(m3u_file_path)?));
+    }
+    
+
 
     // Download the videos that haven't been downloaded yet.
     let download_count = video_ids.iter().progress().enumerate().filter(|(i, video_id)| {
         let file_name = format!("{} [{}].opus", sanitize_filename(&video_titles[*i]), video_id);
-        !downloaded_videos.contains(&file_name) && download_video(video_id, location, format)
+        if folder_contents.contains(&file_name) {
+            if let Some(ref mut m3u_file) = m3u_file {
+                writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+            }
+            false
+        }
+        else if download_video(video_id, location, format) {
+            if let Some(ref mut m3u_file) = m3u_file {
+                writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+            }
+            true
+        } else { false }
     }).count();
 
     match download_count {
@@ -179,10 +210,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let (Some(playlist_id), Some(location)) = (args.playlist_id, args.location) {
         let format = args.format.unwrap_or_else(|| "audio".to_string());
-        sync_playlist(&playlist_id, &location, &format)?;
+        sync_playlist(&playlist_id, &location, &format, "false")?;
     } else {
         for playlist in &config.items {
-            sync_playlist(&playlist.id, &playlist.location, &playlist.format)?;
+            sync_playlist(&playlist.id, &playlist.location, &playlist.format, &playlist.save_playlist)?;
         }
     }
 
