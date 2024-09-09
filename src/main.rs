@@ -155,7 +155,12 @@ fn sync_playlist(id: &str, location: &str, format: &str) -> Result<(), Box<dyn s
         !downloaded_videos.contains(&file_name) && download_video(video_id, location, format)
     }).count();
 
-    println!("{} new songs successfully synced to {}", download_count, location);
+    match download_count {
+        1 =>
+            println!("{} new song successfully synced to {}", download_count, location),
+        _ =>
+            println!("{} new songs successfully synced to {}", download_count, location),
+    }
     Ok(())
 }
 
