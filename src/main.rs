@@ -161,11 +161,11 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
         let parent_dir = location_path.parent().unwrap();
         let child_dir_name = location_path.file_name().unwrap().to_str().unwrap();
 
-        // Create the m3u file in the parent directory.
         let m3u_file_path = parent_dir.join(format!("{}.m3u", child_dir_name));
         // Try to delete old file
         let _ = fs::remove_file(&m3u_file_path).is_err();
 
+        // Create the m3u file in the parent directory.
         m3u_file = Some(BufWriter::new(File::create(m3u_file_path)?));
     }
     
