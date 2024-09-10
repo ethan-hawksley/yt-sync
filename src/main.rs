@@ -39,6 +39,8 @@ struct Args {
     location: Option<String>,
     #[arg(short, long)]
     format: Option<String>,
+    #[arg(short, long)]
+    save_playlist: Option<String>,
 }
 
 // Get the default configuration path for the program.
@@ -210,7 +212,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let (Some(playlist_id), Some(location)) = (args.playlist_id, args.location) {
         let format = args.format.unwrap_or_else(|| "audio".to_string());
-        sync_playlist(&playlist_id, &location, &format, "false")?;
+        let save_playlist = args.save_playlist.unwrap_or_else(|| "true".to_string());
+        sync_playlist(&playlist_id, &location, &format, &save_playlist)?;
     } else {
         for playlist in &config.items {
             sync_playlist(&playlist.id, &playlist.location, &playlist.format, &playlist.save_playlist)?;
