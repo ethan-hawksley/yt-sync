@@ -4,9 +4,9 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use clap::Parser;
 use indicatif::ProgressIterator;
 use serde::{Deserialize, Serialize};
-use clap::Parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct Config {
@@ -153,7 +153,7 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
     let folder_contents: HashSet<_> = fs::read_dir(location)?
         .filter_map(|entry| entry.ok().and_then(|e| e.path().file_name()?.to_str().map(sanitize_filename)))
         .collect();
-    
+
     let mut m3u_file = None;
     if save_playlist == "true" {
         // Extract the parent directory and the child directory name.
@@ -168,7 +168,6 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
         // Create the m3u file in the parent directory.
         m3u_file = Some(BufWriter::new(File::create(m3u_file_path)?));
     }
-    
 
 
     // Download the videos that haven't been downloaded yet.
@@ -179,8 +178,7 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
                 writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
             }
             false
-        }
-        else if download_video(video_id, location, format) {
+        } else if download_video(video_id, location, format) {
             if let Some(ref mut m3u_file) = m3u_file {
                 writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
             }
