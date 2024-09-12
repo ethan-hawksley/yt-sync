@@ -29,7 +29,11 @@ struct VideoInfo {
 
 // Command line arguments for the program.
 #[derive(Parser, Debug)]
-#[command(name = "yt-sync", about = "Sync YouTube playlists to your local storage")]
+#[command(
+    name = "yt-sync",
+    about = "Sync YouTube playlists to your local storage"
+)]
+
 struct Args {
     #[arg(short, long, default_value_t = get_default_config_path())]
     config: String,
@@ -45,7 +49,12 @@ struct Args {
 
 // Get the default configuration path for the program.
 fn get_default_config_path() -> String {
-    dirs::home_dir().unwrap().join(".config/yt-sync/config.toml").to_str().unwrap().to_string()
+    dirs::home_dir()
+        .unwrap()
+        .join(".config/yt-sync/config.toml")
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 // Create a default configuration for the program.
@@ -86,9 +95,15 @@ fn read_config(path: &Path) -> io::Result<Config> {
 }
 
 // Get the video IDs and titles from a YouTube playlist.
-fn get_video_ids(playlist_id: &str) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
+fn get_video_ids(
+    playlist_id: &str,
+) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
     let output = Command::new("yt-dlp")
-        .args(&["-j", "--flat-playlist", &format!("https://www.youtube.com/playlist?list={}", playlist_id)])
+        .args(&[
+            "-j",
+            "--flat-playlist",
+            &format!("https://www.youtube.com/playlist?list={}", playlist_id),
+        ])
         .output()?;
 
     if !output.status.success() {
@@ -117,12 +132,15 @@ fn download_video(video_id: &str, path: &str, format: &str) -> bool {
     } else {
         args.extend(&["-f", "bestvideo+bestaudio", "--merge-output-format", "mkv"]);
     }
-    
-    // Run yt-dlp with the arguments and show an error message if it fails. 
+
+    // Run yt-dlp with the arguments and show an error message if it fails.
     match Command::new("yt-dlp").args(&args).output() {
         Ok(output) if output.status.success() => true,
         Ok(output) => {
-            println!("yt-dlp failed to download {} with args: {:?} and with output: {:?}", video_id, args, output);
+            println!(
+                "yt-dlp failed to download {} with args: {:?} and with output: {:?}",
+                video_id, args, output
+            );
             false
         }
         Err(e) => {
@@ -134,14 +152,22 @@ fn download_video(video_id: &str, path: &str, format: &str) -> bool {
 
 // Sanitize a filename to remove invalid characters.
 fn sanitize_filename(filename: &str) -> String {
-    filename.chars().map(|c| match c {
-        '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '？' => '_',
-        _ => c,
-    }).collect()
+    filename
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '？' => '_',
+            _ => c,
+        })
+        .collect()
 }
 
 // Sync a YouTube playlist to a local directory, ensuring no duplicates are downloaded.
-fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_playlist(
+    id: &str,
+    location: &str,
+    format: &str,
+    save_playlist: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
     fs::create_dir_all(location)?;
 
@@ -151,7 +177,11 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
 
     // Get the list of already downloaded videos.
     let folder_contents: HashSet<_> = fs::read_dir(location)?
-        .filter_map(|entry| entry.ok().and_then(|e| e.path().file_name()?.to_str().map(sanitize_filename)))
+        .filter_map(|entry| {
+            entry
+                .ok()
+                .and_then(|e| e.path().file_name()?.to_str().map(sanitize_filename))
+        })
         .collect();
 
     let mut m3u_file = None;
@@ -169,28 +199,42 @@ fn sync_playlist(id: &str, location: &str, format: &str, save_playlist: &str) ->
         m3u_file = Some(BufWriter::new(File::create(m3u_file_path)?));
     }
 
-
     // Download the videos that haven't been downloaded yet.
-    let download_count = video_ids.iter().progress().enumerate().filter(|(i, video_id)| {
-        let file_name = format!("{} [{}].opus", sanitize_filename(&video_titles[*i]), video_id);
-        if folder_contents.contains(&file_name) {
-            if let Some(ref mut m3u_file) = m3u_file {
-                writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+    let download_count = video_ids
+        .iter()
+        .progress()
+        .enumerate()
+        .filter(|(i, video_id)| {
+            let file_name = format!(
+                "{} [{}].opus",
+                sanitize_filename(&video_titles[*i]),
+                video_id
+            );
+            if folder_contents.contains(&file_name) {
+                if let Some(ref mut m3u_file) = m3u_file {
+                    writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+                }
+                false
+            } else if download_video(video_id, location, format) {
+                if let Some(ref mut m3u_file) = m3u_file {
+                    writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+                }
+                true
+            } else {
+                false
             }
-            false
-        } else if download_video(video_id, location, format) {
-            if let Some(ref mut m3u_file) = m3u_file {
-                writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
-            }
-            true
-        } else { false }
-    }).count();
+        })
+        .count();
 
     match download_count {
-        1 =>
-            println!("{} new song successfully synced to {}", download_count, location),
-        _ =>
-            println!("{} new songs successfully synced to {}", download_count, location),
+        1 => println!(
+            "{} new song successfully synced to {}",
+            download_count, location
+        ),
+        _ => println!(
+            "{} new songs successfully synced to {}",
+            download_count, location
+        ),
     }
     Ok(())
 }
@@ -214,7 +258,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sync_playlist(&playlist_id, &location, &format, &save_playlist)?;
     } else {
         for playlist in &config.items {
-            sync_playlist(&playlist.id, &playlist.location, &playlist.format, &playlist.save_playlist)?;
+            sync_playlist(
+                &playlist.id,
+                &playlist.location,
+                &playlist.format,
+                &playlist.save_playlist,
+            )?;
         }
     }
 
