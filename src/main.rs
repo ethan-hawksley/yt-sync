@@ -111,7 +111,11 @@ fn get_video_ids(
     }
 
     let stdout = String::from_utf8(output.stdout)?;
-    let (mut video_ids, mut video_titles) = (Vec::new(), Vec::new());
+    let stdout_length = stdout.lines().count();
+    let (mut video_ids, mut video_titles) = (
+        Vec::with_capacity(stdout_length),
+        Vec::with_capacity(stdout_length),
+    );
 
     for line in stdout.lines() {
         let video_info: VideoInfo = serde_json::from_str(line)?;
