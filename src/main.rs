@@ -132,7 +132,14 @@ fn get_video_ids(
 fn download_video(video_id: &str, path: &str, format: &str) -> bool {
     // Create a list of arguments to pass to yt-dlp.
     let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
-    let mut args = vec!["-P", path, "-q", "--embed-thumbnail", &*video_url];
+    let mut args = vec![
+        "-P",
+        path,
+        "-q",
+        "--embed-thumbnail",
+        "--embed-metadata",
+        &*video_url,
+    ];
     if format == "audio" {
         args.extend(&["-x", "--audio-format", "opus"]);
     } else {
