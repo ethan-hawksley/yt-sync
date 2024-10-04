@@ -161,7 +161,9 @@ fn sanitize_filename(filename: &str) -> String {
     filename
         .chars()
         .map(|c| match c {
-            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '？' => '_',
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '？' | '＂' | '“' | '”' => {
+                '_'
+            }
             _ => c,
         })
         .collect()
