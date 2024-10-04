@@ -202,6 +202,9 @@ fn sync_playlist(
         })
         .collect();
 
+    if *verbose {
+        println!("Directory contains {:?}", folder_contents);
+    }
     let mut m3u_file = None;
     if save_playlist == "true" {
         // Extract the parent directory and the child directory name.
