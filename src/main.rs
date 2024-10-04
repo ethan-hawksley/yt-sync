@@ -45,6 +45,8 @@ struct Args {
     format: Option<String>,
     #[arg(short, long)]
     save_playlist: Option<String>,
+    #[arg(short, long, action)]
+    verbose: bool,
 }
 
 // Get the default configuration path for the program.
@@ -171,13 +173,16 @@ fn sync_playlist(
     location: &str,
     format: &str,
     save_playlist: &str,
+    verbose: &bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
     fs::create_dir_all(location)?;
 
     // Get the video IDs and titles from the playlist.
     let (video_ids, video_titles) = get_video_ids(id)?;
-    println!("Playlist contains: {:?}", video_titles);
+    if *verbose {
+        println!("Playlist contains: {:?}", video_titles);
+    }
 
     // Get the list of already downloaded videos.
     let folder_contents: HashSet<_> = fs::read_dir(location)?
@@ -214,12 +219,16 @@ fn sync_playlist(
                 sanitize_filename(&video_titles[*i]),
                 video_id
             );
+
             if folder_contents.contains(&file_name) {
                 if let Some(ref mut m3u_file) = m3u_file {
                     writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
                 }
                 false
             } else if download_video(video_id, location, format) {
+                if *verbose {
+                    println!("Downloading \"{file_name}\"");
+                }
                 if let Some(ref mut m3u_file) = m3u_file {
                     writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
                 }
@@ -256,10 +265,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         default_config
     };
 
+    let verbose = args.verbose;
     if let (Some(playlist_id), Some(location)) = (args.playlist_id, args.location) {
         let format = args.format.unwrap_or_else(|| "audio".to_string());
         let save_playlist = args.save_playlist.unwrap_or_else(|| "true".to_string());
-        sync_playlist(&playlist_id, &location, &format, &save_playlist)?;
+        sync_playlist(&playlist_id, &location, &format, &save_playlist, &verbose)?;
     } else {
         for playlist in &config.items {
             sync_playlist(
@@ -267,6 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &playlist.location,
                 &playlist.format,
                 &playlist.save_playlist,
+                &verbose,
             )?;
         }
     }
