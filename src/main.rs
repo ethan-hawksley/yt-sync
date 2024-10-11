@@ -101,7 +101,7 @@ fn get_video_ids(
     playlist_id: &str,
 ) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
     let output = Command::new("yt-dlp")
-        .args(&[
+        .args([
             "-j",
             "--flat-playlist",
             &format!("https://www.youtube.com/playlist?list={}", playlist_id),
