@@ -234,7 +234,7 @@ fn sync_playlist(
 
             if folder_contents.contains(&file_name) {
                 if let Some(ref mut m3u_file) = m3u_file {
-                    writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+                    writeln!(m3u_file, "{}{}", location, file_name).unwrap();
                 }
                 false
             } else if download_video(video_id, location, format) {
@@ -242,7 +242,7 @@ fn sync_playlist(
                     println!("Downloading \"{file_name}\"");
                 }
                 if let Some(ref mut m3u_file) = m3u_file {
-                    writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
+                    writeln!(m3u_file, "{}{}", location, file_name).unwrap();
                 }
                 true
             } else {
