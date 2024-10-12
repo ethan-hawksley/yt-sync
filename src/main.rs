@@ -182,14 +182,14 @@ fn sync_playlist(
     location: &str,
     format: &str,
     save_playlist: &str,
-    verbose: &bool,
+    verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Downloading playlist: {}", id);
     fs::create_dir_all(location)?;
 
     // Get the video IDs and titles from the playlist.
     let (video_ids, video_titles) = get_video_ids(id)?;
-    if *verbose {
+    if verbose {
         println!("Playlist contains: {:?}", video_titles);
     }
 
@@ -202,7 +202,7 @@ fn sync_playlist(
         })
         .collect();
 
-    if *verbose {
+    if verbose {
         println!("Directory contains {:?}", folder_contents);
     }
     let mut m3u_file = None;
@@ -246,7 +246,7 @@ fn sync_playlist(
                 }
                 false
             } else if download_video(video_id, location, format) {
-                if *verbose {
+                if verbose {
                     println!("Downloading \"{file_name}\"");
                 }
                 if let Some(ref mut m3u_file) = m3u_file {
@@ -288,7 +288,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verbose = args.verbose;
     if let Some(playlist_id) = args.playlist_id {
         let (location, format, save_playlist) = (args.location, args.format, args.save_playlist);
-        sync_playlist(&playlist_id, &location, &format, &save_playlist, &verbose)?;
+        sync_playlist(&playlist_id, &location, &format, &save_playlist, verbose)?;
     } else {
         for playlist in &config.items {
             sync_playlist(
@@ -296,7 +296,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &playlist.location,
                 &playlist.format,
                 &playlist.save_playlist,
-                &verbose,
+                verbose,
             )?;
         }
     }
