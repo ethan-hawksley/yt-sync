@@ -40,7 +40,8 @@ struct Args {
     config: String,
     #[arg(short, long)]
     playlist_id: Option<String>,
-    #[arg(short, long, default_value_t =   env::current_dir().unwrap().into_os_string().into_string().unwrap())]
+    #[arg(short, long, default_value_t =   env::current_dir().unwrap().into_os_string().into_string().unwrap()
+    )]
     location: String,
     #[arg(short, long, default_value = "audio")]
     format: String,
