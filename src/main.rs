@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -39,12 +40,12 @@ struct Args {
     config: String,
     #[arg(short, long)]
     playlist_id: Option<String>,
-    #[arg(short, long)]
-    location: Option<String>,
-    #[arg(short, long)]
-    format: Option<String>,
-    #[arg(short, long)]
-    save_playlist: Option<String>,
+    #[arg(short, long, default_value_t =   env::current_dir().unwrap().into_os_string().into_string().unwrap())]
+    location: String,
+    #[arg(short, long, default_value = "audio")]
+    format: String,
+    #[arg(short, long, default_value = "false")]
+    save_playlist: String,
     #[arg(short, long, action)]
     verbose: bool,
 }
@@ -276,7 +277,7 @@ fn sync_playlist(
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    let config_path = PathBuf::from(&args.config);
+    let config_path = PathBuf::from(args.config);
     let config = if config_path.exists() {
         read_config(&config_path)?
     } else {
@@ -286,9 +287,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let verbose = args.verbose;
-    if let (Some(playlist_id), Some(location)) = (args.playlist_id, args.location) {
-        let format = args.format.unwrap_or_else(|| "audio".to_string());
-        let save_playlist = args.save_playlist.unwrap_or_else(|| "true".to_string());
+    if let Some(playlist_id) = args.playlist_id {
+        let (location, format, save_playlist) = (args.location, args.format, args.save_playlist);
         sync_playlist(&playlist_id, &location, &format, &save_playlist, &verbose)?;
     } else {
         for playlist in &config.items {
