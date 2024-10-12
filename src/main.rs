@@ -226,20 +226,19 @@ fn sync_playlist(
         .progress()
         .enumerate()
         .filter(|(i, video_id)| {
-            let file_name;
-            if format == "audio" {
-                file_name = format!(
+            let file_name = if format == "audio" {
+                format!(
                     "{} [{}].opus",
                     sanitize_filename(&video_titles[*i]),
                     video_id
-                );
+                )
             } else {
-                file_name = format!(
+                format!(
                     "{} [{}].mkv",
                     sanitize_filename(&video_titles[*i]),
                     video_id
-                );
-            }
+                )
+            };
 
             if folder_contents.contains(&file_name) {
                 if let Some(ref mut m3u_file) = m3u_file {
