@@ -10,20 +10,3 @@ indicatif = "0.17.8"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 toml = "0.8.19"
-
-# Set the default for dependencies.
-[profile.dev.package."*"]
-opt-level = 3
-
-# Turn on a small amount of optimisation in development mode.
-[profile.dev]
-opt-level = 1
-
-[target.'cfg(any(windows, unix))']
-rustflags = ["-C target-cpu=native"]
-
-[profile.release]
-lto = true
-codegen-units = 1
-debug = true
-opt-level = 3
