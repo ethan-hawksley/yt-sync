@@ -153,7 +153,7 @@ fn download_video(video_id: &str, path: &str, format: &str, verbose: bool) -> bo
 
     // Run yt-dlp with the arguments and show an error message if it fails.
     match Command::new("yt-dlp").args(&args).output() {
-        Ok(output) if output.status.success() => true,
+        Ok(output) if output.status.success() || output.status.code() == Some(100) => true,
         Ok(output) => {
             println!(
                 "yt-dlp failed to download {} with args: {:?} and with output: {:?}",
