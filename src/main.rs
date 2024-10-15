@@ -156,8 +156,8 @@ fn download_video(video_id: &str, path: &str, format: &str, verbose: bool) -> bo
         Ok(output) if output.status.success() || output.status.code() == Some(100) => true,
         Ok(output) => {
             println!(
-                "yt-dlp failed to download {} with args: {:?} and with output: {:?}",
-                video_id, args, output
+                "yt-dlp failed to download {} with args: {:?}, with output: {:?}, and error code {:?}",
+                video_id, args, output, output.status.code()
             );
             false
         }
