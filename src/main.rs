@@ -131,7 +131,7 @@ fn get_video_ids(
 }
 
 // Download a video from YouTube using yt-dlp.
-fn download_video(video_id: &str, path: &str, format: &str) -> bool {
+fn download_video(video_id: &str, path: &str, format: &str, verbose: bool) -> bool {
     // Create a list of arguments to pass to yt-dlp.
     let video_url = format!("https://www.youtube.com/watch?v={}", video_id);
     let mut args = vec![
@@ -146,6 +146,9 @@ fn download_video(video_id: &str, path: &str, format: &str) -> bool {
         args.extend(&["-x", "--audio-format", "opus"]);
     } else {
         args.extend(&["-f", "bestvideo+bestaudio", "--merge-output-format", "mkv"]);
+    }
+    if verbose == true {
+        args.extend(&["-vU"]);
     }
 
     // Run yt-dlp with the arguments and show an error message if it fails.
@@ -246,7 +249,7 @@ fn sync_playlist(
                     writeln!(m3u_file, "{}/{}", location, file_name).unwrap();
                 }
                 false
-            } else if download_video(video_id, location, format) {
+            } else if download_video(video_id, location, format, verbose) {
                 if verbose {
                     println!("Downloading \"{file_name}\"");
                 }
